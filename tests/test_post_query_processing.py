@@ -11,16 +11,113 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import main
 
 
+# Self-contained sample fixtures for testing post-query processing
+SAMPLE_DRIVERS = [
+    {
+        "meeting_key": 1289,
+        "session_key": 11316,
+        "driver_number": 1,
+        "broadcast_name": "L NORRIS",
+        "full_name": "Lando NORRIS",
+        "name_acronym": "NOR",
+        "team_name": "McLaren",
+        "team_colour": "F47600",
+        "first_name": "Lando",
+        "last_name": "Norris",
+        "headshot_url": "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/L/LANNOR01_Lando_Norris/lannor01.png.transform/1col/image.png",
+        "country_code": None
+    },
+    {
+        "meeting_key": 1289,
+        "session_key": 11316,
+        "driver_number": 3,
+        "broadcast_name": "M VERSTAPPEN",
+        "full_name": "Max VERSTAPPEN",
+        "name_acronym": "VER",
+        "team_name": "Red Bull Racing",
+        "team_colour": "4781D7",
+        "first_name": "Max",
+        "last_name": "Verstappen",
+        "headshot_url": "https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/M/MAXVER01_Max_Verstappen/maxver01.png.transform/1col/image.png",
+        "country_code": None
+    }
+]
+
+SAMPLE_LOCATIONS = [
+    {
+        "date": "2026-07-03T12:00:00.116000+00:00",
+        "session_key": 11316,
+        "z": 2025,
+        "y": 12534,
+        "meeting_key": 1289,
+        "driver_number": 1,
+        "x": 1130
+    },
+    {
+        "date": "2026-07-03T12:00:00.476000+00:00",
+        "session_key": 11316,
+        "z": 2025,
+        "y": 12592,
+        "meeting_key": 1289,
+        "driver_number": 1,
+        "x": 1287
+    },
+    {
+        "date": "2026-07-03T12:00:00.656000+00:00",
+        "session_key": 11316,
+        "z": 2025,
+        "y": 12633,
+        "meeting_key": 1289,
+        "driver_number": 1,
+        "x": 1419
+    },
+    {
+        "date": "2026-07-03T12:00:00.956000+00:00",
+        "session_key": 11316,
+        "z": 2026,
+        "y": 12693,
+        "meeting_key": 1289,
+        "driver_number": 1,
+        "x": 1642
+    },
+    {
+        "date": "2026-07-03T12:00:01.096000+00:00",
+        "session_key": 11316,
+        "z": 2026,
+        "y": 12727,
+        "meeting_key": 1289,
+        "driver_number": 1,
+        "x": 1756
+    }
+]
+
+
 class TestPostQueryProcessing(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Load sample data files
-        cls.data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
-        with open(os.path.join(cls.data_dir, 'driver_data.json'), 'r', encoding='utf-8') as f:
-            cls.drivers = json.load(f)
-        with open(os.path.join(cls.data_dir, 'test_location.json'), 'r', encoding='utf-8') as f:
-            cls.locations = json.load(f)
+        # Load sample data files if available in local workspace, otherwise use in-memory fixtures
+        data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
+        driver_file = os.path.join(data_dir, 'driver_data.json')
+        location_file = os.path.join(data_dir, 'test_location.json')
+
+        if os.path.exists(driver_file):
+            try:
+                with open(driver_file, 'r', encoding='utf-8') as f:
+                    cls.drivers = json.load(f)
+            except Exception:
+                cls.drivers = SAMPLE_DRIVERS
+        else:
+            cls.drivers = SAMPLE_DRIVERS
+
+        if os.path.exists(location_file):
+            try:
+                with open(location_file, 'r', encoding='utf-8') as f:
+                    cls.locations = json.load(f)
+            except Exception:
+                cls.locations = SAMPLE_LOCATIONS
+        else:
+            cls.locations = SAMPLE_LOCATIONS
 
     def test_print_table_formatting(self):
         headers = ["Col A", "Column B"]
@@ -28,11 +125,11 @@ class TestPostQueryProcessing(unittest.TestCase):
             ["short", 12345],
             ["a much longer value", 6]
         ]
-        
+
         stdout_buf = io.StringIO()
         with patch("sys.stdout", stdout_buf):
             main.print_table(headers, rows)
-            
+
         output = stdout_buf.getvalue()
         lines = output.strip().split("\n")
         self.assertEqual(len(lines), 4)
@@ -49,7 +146,7 @@ class TestPostQueryProcessing(unittest.TestCase):
 
     def test_relative_time_and_iso_formatting(self):
         session_start = main.parse_iso_datetime("2026-07-03T12:00:00+00:00")
-        
+
         # Exact start
         dt1 = main.parse_iso_datetime("2026-07-03T12:00:00.000+00:00")
         diff1 = dt1 - session_start
@@ -66,7 +163,7 @@ class TestPostQueryProcessing(unittest.TestCase):
 
     def test_driver_data_lookup_and_formatting(self):
         driver_map = {d["driver_number"]: d for d in self.drivers}
-        
+
         # Test driver 1 (Norris)
         norris = driver_map.get(1)
         self.assertIsNotNone(norris)
@@ -83,7 +180,7 @@ class TestPostQueryProcessing(unittest.TestCase):
         self.assertEqual(display_str, "NOR (#1)")
 
     def test_location_sample_data_processing(self):
-        # Pick first 5 location records from data/test_location.json
+        # Pick first 5 location records
         sample_locs = self.locations[:5]
         session_start = main.parse_iso_datetime("2026-07-03T12:00:00+00:00")
 
@@ -113,8 +210,6 @@ class TestPostQueryProcessing(unittest.TestCase):
         self.assertEqual(rows[0][5], 2025)
 
     def test_brake_value_interpretation(self):
-        # Format brake status as done in main.py:
-        # if brake_val is True or (isinstance(brake_val, (int, float)) and brake_val > 0): "On" else "Off"
         def interpret_brake(brake_val):
             if brake_val is True or (isinstance(brake_val, (int, float)) and brake_val > 0):
                 return "On"
